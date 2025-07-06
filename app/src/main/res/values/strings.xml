@@ -2,7 +2,7 @@
     <string name="app_name">MarkdownEditor</string>
     <string name="save">Сохранить</string>
     <string name="edit">Редактировать</string>
-    <string name="markdown_editor">markdown_editor</string>
+    <string name="markdown_editor">Ugly Markdown Editor</string>
     <string name="choose_file_from_gadget">Выбрать файл с устройства</string>
     <string name="enter_url">Введите URL (http/https)</string>
     <string name="load_url">Загрузить по URL</string>
