@@ -2,18 +2,19 @@
 <androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fitsSystemWindows="true">
+    android:fitsSystemWindows="true"
+    android:backgroundTint="@color/main_screen">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="@dimen/_16dp">
 
         <ScrollView
             android:id="@+id/markdownPreviewContainer"
             android:layout_width="match_parent"
-            android:layout_height="0dp"
+            android:layout_height="@dimen/_0dp"
             android:layout_weight="1">
 
             <LinearLayout
@@ -26,7 +27,7 @@
         <EditText
             android:id="@+id/markdownEditor"
             android:layout_width="match_parent"
-            android:layout_height="0dp"
+            android:layout_height="@dimen/_0dp"
             android:layout_weight="1"
             android:gravity="top"
             android:inputType="textMultiLine"
@@ -38,10 +39,11 @@
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingVertical="8dp">
+            android:paddingVertical="@dimen/_8dp">
 
             <Button
                 android:id="@+id/btnEdit"
+                style="@style/StyleButtons"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -49,6 +51,7 @@
 
             <Button
                 android:id="@+id/btnSave"
+                style="@style/StyleButtons"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"

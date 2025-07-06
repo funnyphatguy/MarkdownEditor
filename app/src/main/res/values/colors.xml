@@ -2,4 +2,8 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="txt_header">#5F3678</color>
+    <color name="bt_file">#525DC0</color>
+    <color name="bt_url">#422952</color>
+    <color name="main_screen">#F4FAFF</color>
 </resources>
