@@ -1,34 +1,41 @@
 package com.example.markdowneditor
 
+import android.content.ContentValues
 import android.content.Intent
+import android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+import android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
 import android.net.Uri
 import android.os.Bundle
+import android.provider.MediaStore
+import android.util.Patterns
+import android.widget.EditText
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.markdowneditor.databinding.ActivityMainBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.net.HttpURLConnection
 import java.net.URL
-
 
 class MainActivity : AppCompatActivity() {
 
     private var _binding: ActivityMainBinding? = null
-    private val binding
-        get() = requireNotNull(_binding) {
-            "Binding for ActivityMainBinding must not be null"
-        }
-    private val filePickerLauncher = registerForActivityResult(
-        ActivityResultContracts.GetContent()
+    private val binding get() = requireNotNull(_binding) { "Binding must not be null" }
+
+    private val filePicker = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        uri?.let { loadFromFile(it) }
+        uri?.let {
+            contentResolver.takePersistableUriPermission(
+                it,
+                FLAG_GRANT_READ_URI_PERMISSION or FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+            openViewer(it)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,80 +45,108 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         binding.btnFile.setOnClickListener {
-            openFilePicker()
+            filePicker.launch(arrayOf("text/*"))
+        }
+        binding.btnUrl.setOnClickListener { handleUrlInput() }
+    }
+
+    private fun handleUrlInput() {
+        val url = binding.etUrl.text.toString().trim()
+        if (url.isEmpty()) {
+            Toast.makeText(this, "Введите URL", Toast.LENGTH_SHORT).show()
+            return
         }
 
-        binding.btnUrl.setOnClickListener {
-            val url = binding.etUrl.text.toString().trim()
-            if (url.isNotEmpty()) {
-                loadFromUrl(url)
-            } else {
-                Toast.makeText(this, "Введите URL", Toast.LENGTH_SHORT).show()
+        if (!isValidUrl(url)) {
+            Toast.makeText(this, "Введите корректный URL", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        showFilenameDialog(url)
+    }
+
+    private fun isValidUrl(url: String): Boolean {
+        return try {
+            Patterns.WEB_URL.matcher(url).matches()
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun showFilenameDialog(url: String) {
+        val input = EditText(this).apply {
+            hint = "document.md"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Имя файла")
+            .setView(input)
+            .setPositiveButton("OK") { _, _ ->
+                val filename = input.text.toString().trim()
+                if (filename.isNotEmpty()) {
+                    downloadAndSave(url, filename)
+                } else {
+                    Toast.makeText(this, "Введите имя файла", Toast.LENGTH_SHORT).show()
+                }
             }
-        }
+            .setNegativeButton("Отмена", null)
+            .show()
     }
 
-    private fun openFilePicker() {
-        filePickerLauncher.launch("text/*")
-    }
-
-    private fun loadFromFile(uri: Uri) {
+    private fun downloadAndSave(url: String, filename: String) {
         lifecycleScope.launch {
             try {
                 val content = withContext(Dispatchers.IO) {
-                    contentResolver.openInputStream(uri)?.use { inputStream ->
-                        BufferedReader(InputStreamReader(inputStream)).useLines { lines ->
-                            lines.joinToString("\n")
-                        }
-                    } ?: ""
+                    URL(url).openStream().bufferedReader().use { it.readText() }
                 }
-                if (content.isNotEmpty()) {
-                    openMarkdownViewer(content)
-                } else {
+
+                if (content.isBlank()) {
                     Toast.makeText(this@MainActivity, "Файл пуст", Toast.LENGTH_SHORT).show()
+                    return@launch
                 }
+
+                val finalName = if (filename.endsWith(".md")) filename else "$filename.md"
+                val uri = createFile(finalName, content)
+                openViewer(uri)
+
             } catch (e: Exception) {
                 Toast.makeText(
                     this@MainActivity,
-                    "Ошибка загрузки файла: ${e.message}",
+                    "Ошибка загрузки: ${e.message}",
                     Toast.LENGTH_LONG
                 ).show()
             }
         }
     }
 
-    private fun loadFromUrl(urlString: String) {
-        lifecycleScope.launch {
-            try {
-                val content = withContext(Dispatchers.IO) {
-                    val url = URL(urlString)
-                    val connection = url.openConnection() as HttpURLConnection
-                    connection.connectTimeout = 10000
-                    connection.readTimeout = 10000
+    private fun createFile(filename: String, content: String): Uri? {
+        val values = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
+            put(MediaStore.MediaColumns.MIME_TYPE, "text/markdown")
+            put(MediaStore.MediaColumns.RELATIVE_PATH, "Documents/Markdown")
+        }
 
-                    BufferedReader(InputStreamReader(connection.inputStream)).use { reader ->
-                        reader.readText()
-                    }
-                }
-
-                if (content.isNotEmpty()) {
-                    openMarkdownViewer(content)
-                } else {
-                    Toast.makeText(this@MainActivity, "Файл URL пуст", Toast.LENGTH_SHORT).show()
-                }
-            } catch (e: Exception) {
-                Toast.makeText(
-                    this@MainActivity,
-                    "Ошибка загрузки URL: ${e.message}",
-                    Toast.LENGTH_LONG
-                ).show()
+        return contentResolver.insert(
+            MediaStore.Files.getContentUri("external"),
+            values
+        )?.also { uri ->
+            contentResolver.openOutputStream(uri)?.use {
+                it.write(content.toByteArray())
             }
         }
     }
 
-    private fun openMarkdownViewer(content: String) {
-        val intent = Intent(this, MarkdownViewerActivity::class.java)
-        intent.putExtra("markdown_content", content)
-        startActivity(intent)
+    private fun openViewer(uri: Uri?) {
+        startActivity(
+            Intent(this, MarkdownViewerActivity::class.java).apply {
+                putExtra("file_uri", uri.toString())
+            }
+        )
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        _binding = null
     }
 }
